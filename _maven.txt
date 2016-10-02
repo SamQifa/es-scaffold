@@ -1,1 +1,2 @@
 test my maven -in merging for conflict
+this is for merge mode
