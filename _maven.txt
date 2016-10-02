@@ -1,1 +1,1 @@
-test my maven
+test my maven -in dev
