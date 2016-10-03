@@ -8,6 +8,9 @@ git reflog
 git checkout -b dev
 git branch -d dev
 git merge --no-ff -m "this is no-ff merge mode" dev
+$ git add . && git commit -m "initial drop"
+$ git rebase master
+$ git status -s
 
 要关联一个远程库，使用命令git remote add origin git@server-name:path/repo-name.git；
 关联后，使用命令git push -u origin master第一次推送master分支的所有内容；
@@ -52,3 +55,178 @@ Git分支十分强大，在团队开发中应该充分应用。
 首先，master分支应该是非常稳定的，也就是仅用来发布新版本，平时不能在上面干活；
 那在哪干活呢？干活都在dev分支上，也就是说，dev分支是不稳定的，到某个时候，比如1.0版本发布时，再把dev分支合并到master上，在master分支发布1.0版本；
 你和你的小伙伴们每个人都在dev分支上干活，每个人都有自己的分支，时不时地往dev分支上合并就可以了。
+
+当你接到一个修复一个代号101的bug的任务时，很自然地，你想创建一个分支issue-101来修复它，但是，等等，当前正在dev上进行的工作还没有提交：
+$ git status
+# On branch dev
+# Changes to be committed:
+#   (use "git reset HEAD <file>..." to unstage)
+#
+#       new file:   hello.py
+#
+# Changes not staged for commit:
+#   (use "git add <file>..." to update what will be committed)
+#   (use "git checkout -- <file>..." to discard changes in working directory)
+#
+#       modified:   readme.txt
+#
+并不是你不想提交，而是工作只进行到一半，还没法提交，预计完成还需1天时间。但是，必须在两个小时内修复该bug，怎么办？
+幸好，Git还提供了一个stash功能，可以把当前工作现场“储藏”起来，等以后恢复现场后继续工作：
+$ git stash
+Saved working directory and index state WIP on dev: 6224937 add merge
+HEAD is now at 6224937 add merge
+现在，用git status查看工作区，就是干净的（除非有没有被Git管理的文件），因此可以放心地创建分支来修复bug。
+
+修复bug时，我们会通过创建新的bug分支进行修复，然后合并，最后删除；
+当手头工作没有完成时，先把工作现场git stash一下，然后去修复bug，修复后，再git stash pop，回到工作现场。
+
+用git stash list命令看看：
+$ git stash list
+stash@{0}: WIP on dev: 6224937 add merge
+工作现场还在，Git把stash内容存在某个地方了，但是需要恢复一下，有两个办法：
+一是用git stash apply恢复，但是恢复后，stash内容并不删除，你需要用git stash drop来删除；
+另一种方式是用git stash pop，恢复的同时把stash内容也删了：
+
+rerere = reuse recorded resolution
+它会让Git记住你是如何解决某个文件的两个版本之间的conflict，这样在下次Git遇到同样的文件在相同的两个版本间发生冲突时，可以自动帮你使用相同的方法解决冲突。
+如何启用rerere？
+git config --global rerere.enabled true
+
+rerere帮我自动处理了conflict，但我已经忘了这个文件conflict的时候是啥样子了。。。能看看conflict的时候的样子吗？
+执行git checkout --conflict=merge <path>即可
+
+git pull后提示有文件冲突，则修改有冲突的地方，再git commit -a，git pull xxx, git push xxx。
+不像svn，冲突文件修改后还要resolve一下，直接提交就行。
+
+
+
+=============start================================= git push 每次都需要输入用户名和密码 ======================================
+解决方案：
+
+每次都需要输入用户名和密码是因为你采用的是 https 方式提交代码， 如果采用的是 ssh 方式只需要在版本库中添加用户的 sha 的key就可以实现提交时无需输入用户名和密码。
+详细步骤：
+
+步骤1：
+
+如果你的版本库已经用https 方式创建好了，那么就需要先删除原来的提交方式。在终端执行以下指令：
+
+ git remote rm origin
+ git remote add origin git@github.com:(用户名)/版本库名
+
+这里我提供一下我的具体例子： 
+https: https://github.com/用户名/GitTest.git 
+ssh: git@github.com:用户名/GitTest.git 
+我是怎么知道的呢？如果你在创建版本库时选择不创建README.md，系统会提示你创建：
+
+https：
+…or create a new repository on the command line
+echo # GitTest >> README.md
+
+git init
+git add README.md
+git commit -m "first commit"
+git remote add origin https://github.com/Sugerming/GitTest.git
+git push -u origin master
+
+…or push an existing repository from the command line
+git remote add origin https://github.com/Sugerming/GitTest.git
+git push -u origin master
+
+
+
+ssh:
+…or create a new repository on the command line
+echo # GitTest >> README.md
+
+git init
+git add README.md
+git commit -m "first commit"
+git remote add origin git@github.com:Sugerming/GitTest.git
+git push -u origin master
+
+
+…or push an existing repository from the command line
+git remote add origin git@github.com:Sugerming/GitTest.git
+git push -u origin master
+
+步骤2：
+
+然后这个时候你使用下面指令提交代码：
+
+git push -u origin master
+
+系统会提示：
+
+The authenticity of host 'github.com (192.30.252.131)' can't be established.
+RSA key fingerprint is SHA256:nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'github.com,192.30.252.131' (RSA) to the list of known h                             osts.
+Permission denied (publickey).
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+
+说明你权限不够。所以这时你需要在本地创建自己的RSA的key。如下：
+
+ssh-keygen -t rsa -C "用户名"
+
+然后系统会问你保存路径等东西，我直接enter跳过了。
+
+Generating public/private rsa key pair.
+Enter file in which to save the key (/c/Users/AlexYi/.ssh/id_rsa):
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+
+然后系统会生成一些东西：
+
+Your identification has been saved in /c/Users/AlexYi/.ssh/id_rsa.
+Your public key has been saved in /c/Users/AlexYi/.ssh/id_rsa.pub.
+The key fingerprint is:
+SHA256:rxfK05d7oZWpDvQ5dRQM0Na7...
+The key's randomart image is:
++---[RSA 2048]----+
+|           .o.+. |
+|             o o.|
+|            .   o|
+|               o |
+...
+
+最主要的是告诉你，你的可以在：
+
+Your public key has been saved in /c/Users/AlexYi/.ssh/id_rsa.pub
+
+找到这个文件，然后用记事本打开，就可以看到自己的key：
+
+ssh-rsa AAAAB3NzaC1yc2EAAAADA...
+
+步骤3：
+
+然后将生成的rsa 的key添加到版本库中即可，方法： 
+打开自己的版本库，点击右边的 Settings 进入配置页。 
+然后点击左边导航栏的： Deploy keys 进入添加key页面 
+然后点击： Add deploy keys ，将自己的内容输入进去就可以了。 
+这样就完成了。
+
+最后继续提交更改的代码，使用：
+
+git push -u origin master
+
+可以提交成功。
+
+补充：
+
+如果要使用 git push简短提交代码：
+
+git push
+
+需要配置 :
+
+git config --global push.default simple
+
+或者：
+
+git config --global push.default matching
+
+区别在于，前者只提交你当前所在的分支，而后者会提交本地所有的分支。具体的自己去查一下就明白了
+
+=============end================================= git push 每次都需要输入用户名和密码 ======================================
